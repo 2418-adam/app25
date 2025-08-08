@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 종합 역술원 - 최종 완성판</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" xintegrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Nanum Gothic', sans-serif; }
+        .card { backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #5eead4; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .preview-box { width: 128px; height: 128px; }
+        .preview-img { width: 100%; height: 100%; object-fit: cover; }
+
+        #camera-modal, #ritual-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: none; justify-content: center; align-items: center; z-index: 50;
+        }
+        #camera-container, #ritual-modal-content {
+            background-color: #111827; padding: 20px; border-radius: 15px;
+            width: 90%; max-width: 500px;
+        }
+        #camera-stream { width: 100%; border-radius: 10px; }
+
+        .result-saju-card {
+            background: rgba(13, 70, 63, 0.3);
+            border: 1px solid rgba(94, 234, 212, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+        .result-section h3 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #5eead4;
+            border-bottom: 2px solid rgba(94, 234, 212, 0.3);
+            padding-bottom: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .result-section p {
+            line-height: 2.2; 
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            font-size: 16px;
+            letter-spacing: -0.2px;
+        }
+        .form-select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+        .form-select option {
+            background-color: #1f2937;
+            color: #f9fafb;
+        }
+        .topic-label {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .topic-checkbox:checked + .topic-label {
+            background-color: #14b8a6;
+            color: white;
+            border-color: #14b8a6;
+            transform: scale(1.05);
+        }
+        
+        /* PDF Specific Styles */
+        .pdf-section {
+            page-break-after: always;
+        }
+        .pdf-section:last-child {
+            page-break-after: avoid;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-teal-900 to-indigo-900 text-white min-h-screen flex items-center justify-center p-4 md:p-8">
+
+    <div class="w-full max-w-7xl mx-auto">
+        <div id="form-section" class="card bg-black/30 border border-teal-500/20 rounded-2xl shadow-2xl p-6 md:p-10">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl md:text-5xl font-bold tracking-wider" style="font-family: 'Nanum Gothic', sans-serif; font-weight: 700;">AI 천기대사 (天機大師)</h1>
+                <p class="text-teal-300 mt-3 text-lg">하늘의 뜻을 물어, 인생의 길을 밝힙니다</p>
+            </div>
+
+            <form id="main-form" class="space-y-8 max-w-5xl mx-auto">
+                <!-- Form sections remain the same -->
+                <fieldset>
+                    <legend class="text-xl font-semibold text-teal-200 border-b border-teal-400/50 pb-2 mb-4">1. 인적 사항</legend>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div><label for="name" class="block text-sm font-medium mb-2">이름 (한글)</label><input type="text" id="name" required class="w-full bg-white/10 border-white/20 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-400 focus:outline-none" placeholder="홍길동"></div>
+                        <div><label for="hanja-name" class="block text-sm font-medium mb-2">이름 (한자)</label><input type="text" id="hanja-name" class="w-full bg-white/10 border-white/20 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-400 focus:outline-none" placeholder="洪吉童"></div>
+                        <div class="flex items-center space-x-6 pt-7">
+                            <label class="flex items-center"><input type="radio" name="gender" value="male" class="h-4 w-4 text-teal-500 bg-gray-700 border-gray-500 focus:ring-teal-500"> <span class="ml-2">남자</span></label>
+                            <label class="flex items-center"><input type="radio" name="gender" value="female" class="h-4 w-4 text-teal-500 bg-gray-700 border-gray-500 focus:ring-teal-500"> <span class="ml-2">여자</span></label>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend class="text-xl font-semibold text-teal-200 border-b border-teal-400/50 pb-2 mb-4">2. 생년월일시</legend>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <select id="birth-year" class="form-select w-full bg-white/10 border-white/20 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-400 focus:outline-none"></select>
+                        <select id="birth-month" class="form-select w-full bg-white/10 border-white/20 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-400 focus:outline-none"></select>
+                        <select id="birth-day" class="form-select w-full bg-white/10 border-white/20 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-400 focus:outline-none"></select>
+                        <select id="birth-hour" class="form-select w-full bg-white/10 border-white/20 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-400 focus:outline-none"></select>
+                    </div>
+                    <div class="flex items-center space-x-6">
+                        <label class="flex items-center"><input type="radio" name="calendar-type" value="solar" checked class="h-4 w-4 text-teal-500 bg-gray-700 border-gray-500 focus:ring-teal-500"> <span class="ml-2">양력</span></label>
+                        <label class="flex items-center"><input type="radio" name="calendar-type" value="lunar" class="h-4 w-4 text-teal-500 bg-gray-700 border-gray-500 focus:ring-teal-500"> <span class="ml-2">음력(평달)</span></label>
+                        <label class="flex items-center"><input type="radio" name="calendar-type" value="lunar-leap" class="h-4 w-4 text-teal-500 bg-gray-700 border-gray-500 focus:ring-teal-500"> <span class="ml-2">음력(윤달)</span></label>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend class="text-xl font-semibold text-teal-200 border-b border-teal-400/50 pb-2 mb-4">3. 관상 및 손금</legend>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="text-center"><label class="block text-sm font-medium mb-2">관상 (얼굴) <span class="text-gray-400">(선택)</span></label><div id="face-preview-box" class="preview-box mx-auto bg-black/20 rounded-lg flex items-center justify-center border-2 border-dashed border-white/30"><span class="text-gray-400 text-xs">미리보기</span></div><input type="file" id="face-photo" accept="image/*" class="hidden"><button type="button" data-target="face" class="take-photo-btn mt-2 mr-2 bg-teal-600 hover:bg-teal-700 text-white py-2 px-4 rounded-lg text-sm">촬영</button><button type="button" data-target="face" class="upload-photo-btn mt-2 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm">업로드</button></div>
+                        <div class="text-center"><label class="block text-sm font-medium mb-2">손금 (손바닥) <span class="text-gray-400">(선택)</span></label><div id="palm-preview-box" class="preview-box mx-auto bg-black/20 rounded-lg flex items-center justify-center border-2 border-dashed border-white/30"><span class="text-gray-400 text-xs">미리보기</span></div><input type="file" id="palm-photo" accept="image/*" class="hidden"><button type="button" data-target="palm" class="take-photo-btn mt-2 mr-2 bg-teal-600 hover:bg-teal-700 text-white py-2 px-4 rounded-lg text-sm">촬영</button><button type="button" data-target="palm" class="upload-photo-btn mt-2 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm">업로드</button></div>
+                    </div>
+                </fieldset>
+                <fieldset>
+                     <legend class="text-xl font-semibold text-teal-200 border-b border-teal-400/50 pb-2 mb-4">4. 분석 주제 선택</legend>
+                     <div id="topic-selection" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div><input type="checkbox" id="topic1" name="topic" value="종합운" class="hidden topic-checkbox"><label for="topic1" class="topic-label block text-center p-4 border border-teal-500/50 rounded-lg">종합운</label></div>
+                        <div><input type="checkbox" id="topic2" name="topic" value="성격 분석" class="hidden topic-checkbox"><label for="topic2" class="topic-label block text-center p-4 border border-teal-500/50 rounded-lg">성격 분석</label></div>
+                        <div><input type="checkbox" id="topic3" name="topic" value="재물운" class="hidden topic-checkbox"><label for="topic3" class="topic-label block text-center p-4 border border-teal-500/50 rounded-lg">재물운</label></div>
+                        <div><input type="checkbox" id="topic4" name="topic" value="직업운" class="hidden topic-checkbox"><label for="topic4" class="topic-label block text-center p-4 border border-teal-500/50 rounded-lg">직업운</label></div>
+                        <div><input type="checkbox" id="topic5" name="topic" value="애정운" class="hidden topic-checkbox"><label for="topic5" class="topic-label block text-center p-4 border border-teal-500/50 rounded-lg">애정운</label></div>
+                        <div><input type="checkbox" id="topic6" name="topic" value="건강운" class="hidden topic-checkbox"><label for="topic6" class="topic-label block text-center p-4 border border-teal-500/50 rounded-lg">건강운</label></div>
+                     </div>
+                </fieldset>
+
+                <button type="submit" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-4 px-4 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105 text-lg">
+                    천명(天命) 분석 요청
+                </button>
+            </form>
+        </div>
+
+        <div id="loading" class="hidden flex justify-center items-center mt-8"><div class="loader"></div><p class="ml-4 text-lg">우주의 기운을 모으고 있습니다...</p></div>
+        <div id="message-box" class="hidden mt-6 p-4 bg-red-500/50 border-red-500 rounded-lg text-center"></div>
+        <div id="result-container" class="hidden mt-8"></div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal">
+        <div id="camera-container">
+            <video id="camera-stream" autoplay playsinline></video>
+            <canvas id="camera-canvas" class="hidden"></canvas>
+            <div class="flex justify-center mt-4 space-x-4">
+                <button id="capture-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-6 rounded-full">촬영</button>
+                <button id="switch-camera-btn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-full">전환</button>
+                <button id="cancel-btn" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-6 rounded-full">취소</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ritual Modal -->
+    <div id="ritual-modal">
+        <div id="ritual-modal-content" class="relative">
+             <button id="close-ritual-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white">&times;</button>
+             <div id="ritual-content" class="result-section"></div>
+        </div>
+    </div>
+    
+    <audio id="tts-audio-player" class="hidden"></audio>
+
+    <script>
+        const GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
+        const JI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+        let currentFacingMode = 'user';
+        let currentCameraTarget = { input: null, preview: null };
+        let currentFormData = {};
+        let fullAnalysisText = "";
+
+        const formSection = document.getElementById('form-section');
+        const loading = document.getElementById('loading');
+        const resultContainer = document.getElementById('result-container');
+        const messageBox = document.getElementById('message-box');
+        const facePhotoInput = document.getElementById('face-photo');
+        const palmPhotoInput = document.getElementById('palm-photo');
+        const facePreviewBox = document.getElementById('face-preview-box');
+        const palmPreviewBox = document.getElementById('palm-preview-box');
+        const cameraModal = document.getElementById('camera-modal');
+        const cameraStream = document.getElementById('camera-stream');
+        const cameraCanvas = document.getElementById('camera-canvas');
+        const captureBtn = document.getElementById('capture-btn');
+        const switchCameraBtn = document.getElementById('switch-camera-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const ritualModal = document.getElementById('ritual-modal');
+        const ritualContent = document.getElementById('ritual-content');
+        const closeRitualModalBtn = document.getElementById('close-ritual-modal');
+
+        window.onload = () => {
+            populateDateSelectors();
+            requestCameraPermission();
+        };
+
+        async function requestCameraPermission() {
+             try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+            } catch (err) { console.log("Camera permission not granted on load."); }
+        }
+
+        function populateDateSelectors() {
+            const yearSelect = document.getElementById('birth-year');
+            const monthSelect = document.getElementById('birth-month');
+            const daySelect = document.getElementById('birth-day');
+            const hourSelect = document.getElementById('birth-hour');
+            
+            const currentYear = new Date().getFullYear();
+            yearSelect.innerHTML = '<option value="">년</option>';
+            for (let i = currentYear; i >= 1930; i--) { yearSelect.add(new Option(`${i}년`, i)); }
+            
+            monthSelect.innerHTML = '<option value="">월</option>';
+            for (let i = 1; i <= 12; i++) { monthSelect.add(new Option(`${i}월`, i)); }
+
+            daySelect.innerHTML = '<option value="">일</option>';
+            for (let i = 1; i <= 31; i++) { daySelect.add(new Option(`${i}일`, i)); }
+            
+            const timeSigns = [
+                { name: '생시 모름', value: 'unknown'}, { name: '자/야 (23:30~00:29)', value: '23' },
+                { name: '자/조 (00:30~01:29)', value: '00' }, { name: '축 (01:30~03:29)', value: '02' },
+                { name: '인 (03:30~05:29)', value: '04' }, { name: '묘 (05:30~07:29)', value: '06' },
+                { name: '진 (07:30~09:29)', value: '08' }, { name: '사 (09:30~11:29)', value: '10' },
+                { name: '오 (11:30~13:29)', value: '12' }, { name: '미 (13:30~15:29)', value: '14' },
+                { name: '신 (15:30~17:29)', value: '16' }, { name: '유 (17:30~19:29)', value: '18' },
+                { name: '술 (19:30~21:29)', value: '20' }, { name: '해 (21:30~23:29)', value: '22' }
+            ];
+            hourSelect.innerHTML = '';
+            timeSigns.forEach(sign => hourSelect.add(new Option(sign.name, sign.value)));
+        }
+
+        document.querySelectorAll('input[name="calendar-type"]').forEach(elem => elem.addEventListener('change', (e) => {
+            const isLunar = e.target.value.includes('lunar');
+            if(isLunar) console.log("Lunar calendar selected. Conversion logic needed for accuracy.");
+        }));
+        
+        document.querySelectorAll('.upload-photo-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            const target = e.currentTarget.dataset.target;
+            if (target === 'face') facePhotoInput.click(); else palmPhotoInput.click();
+        }));
+        facePhotoInput.addEventListener('change', (e) => previewImage(e.target, facePreviewBox));
+        palmPhotoInput.addEventListener('change', (e) => previewImage(e.target, palmPreviewBox));
+        document.querySelectorAll('.take-photo-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            const target = e.currentTarget.dataset.target;
+            currentCameraTarget.input = (target === 'face') ? facePhotoInput : palmPhotoInput;
+            currentCameraTarget.preview = (target === 'face') ? facePreviewBox : palmPreviewBox;
+            startCamera();
+        }));
+        cancelBtn.addEventListener('click', stopCamera);
+        captureBtn.addEventListener('click', takePicture);
+        switchCameraBtn.addEventListener('click', switchCamera);
+        document.getElementById('main-form').addEventListener('submit', handleFormSubmit);
+        closeRitualModalBtn.addEventListener('click', () => ritualModal.style.display = 'none');
+
+        async function startCamera() {
+            stopCamera();
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
+                cameraStream.srcObject = stream;
+                cameraModal.style.display = 'flex';
+            } catch (err) { showMessage("카메라를 열 수 없습니다. 브라우저의 카메라 권한을 확인해주세요."); }
+        }
+        function stopCamera() {
+            if (cameraStream.srcObject) {
+                cameraStream.srcObject.getTracks().forEach(track => track.stop());
+                cameraStream.srcObject = null;
+            }
+            cameraModal.style.display = 'none';
+        }
+        function switchCamera() {
+            currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+            startCamera();
+        }
+        function takePicture() {
+            const video = cameraStream;
+            const canvas = cameraCanvas;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+            currentCameraTarget.preview.innerHTML = `<img src="${dataUrl}" alt="preview" class="preview-img rounded-lg">`;
+            const file = dataURLtoFile(dataUrl, `${currentCameraTarget.input.id}.jpg`);
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            currentCameraTarget.input.files = dataTransfer.files;
+            stopCamera();
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            resultContainer.classList.add('hidden');
+            resultContainer.innerHTML = '';
+            messageBox.classList.add('hidden');
+            
+            try {
+                const nameInput = document.getElementById('name');
+                const yearSelect = document.getElementById('birth-year');
+                const monthSelect = document.getElementById('birth-month');
+                const daySelect = document.getElementById('birth-day');
+                const hourSelect = document.getElementById('birth-hour');
+                const genderInput = document.querySelector('input[name="gender"]:checked');
+                const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+
+                if (!nameInput.value) throw new Error("이름을 입력해주세요.");
+                if (!genderInput) throw new Error("성별을 선택해주세요.");
+                if (!yearSelect.value || !monthSelect.value || !daySelect.value) throw new Error("생년월일을 모두 선택해주세요.");
+                if (selectedTopics.length === 0) throw new Error("분석 주제를 하나 이상 선택해주세요.");
+
+                formSection.classList.add('hidden');
+                loading.classList.remove('hidden');
+
+                const hourValue = hourSelect.value;
+                const birthTime = hourValue === 'unknown' ? null : `${hourValue.padStart(2, '0')}:30`;
+
+                currentFormData = {
+                    name: nameInput.value,
+                    hanjaName: document.getElementById('hanja-name').value,
+                    gender: genderInput.value,
+                    birthdate: `${yearSelect.value}-${monthSelect.value.padStart(2, '0')}-${daySelect.value.padStart(2, '0')}`,
+                    birthtime: birthTime,
+                    calendarType: document.querySelector('input[name="calendar-type"]:checked').value,
+                    question: selectedTopics.join(', '),
+                };
+                
+                const sajuData = calculateSaju(new Date(`${currentFormData.birthdate}T${currentFormData.birthtime || '12:00'}`), currentFormData.birthtime);
+                const faceFile = document.getElementById('face-photo').files[0];
+                const palmFile = document.getElementById('palm-photo').files[0];
+                const faceBase64 = faceFile ? await fileToBase64(faceFile) : null;
+                const palmBase64 = palmFile ? await fileToBase64(palmFile) : null;
+                const prompt = createPrompt({...currentFormData, sajuData});
+                fullAnalysisText = await generateFortune(prompt, faceBase64, palmBase64);
+                displayResults(sajuData, fullAnalysisText);
+            } catch (error) {
+                showMessage(error.message || "분석 중 오류가 발생했습니다.");
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+        
+        function showMessage(message) {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+        function previewImage(input, previewBox) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => { previewBox.innerHTML = `<img src="${e.target.result}" alt="preview" class="preview-img rounded-lg">`; };
+                reader.readAsDataURL(file);
+            }
+        }
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
+        function dataURLtoFile(dataurl, filename) {
+            let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+            return new File([u8arr], filename, {type:mime});
+        }
+        
+        function calculateSaju(birth, birthTime) {
+            const year = birth.getFullYear(), month = birth.getMonth() + 1, day = birth.getDate();
+            const totalDays = Math.floor((birth - new Date('1900-01-01')) / (1000 * 60 * 60 * 24));
+            
+            let hourPillar = { gan: '?', ji: '?'};
+            if (birthTime) {
+                 hourPillar = { 
+                    gan: GAN[((totalDays % 10) * 2 + Math.floor((birth.getHours() + 1) / 2) % 12) % 10], 
+                    ji: JI[Math.floor((birth.getHours() + 1) / 2) % 12] 
+                };
+            }
+
+            return {
+                yearPillar: { gan: GAN[(year - 4) % 10], ji: JI[(year - 4) % 12] },
+                monthPillar: { gan: GAN[(year * 12 + month) % 10], ji: JI[month % 12] },
+                dayPillar: { gan: GAN[totalDays % 10], ji: JI[totalDays % 12] },
+                hourPillar: hourPillar
+            };
+        }
+
+        function createPrompt(data) {
+            const birthType = data.calendarType === 'solar' ? '양력' : (data.calendarType === 'lunar-leap' ? '음력(윤달)' : '음력(평달)');
+            const birthTimeText = data.birthtime ? `약 ${data.birthtime} 경` : "시간 모름";
+
+            return `
+            당신은 인간의 운명을 꿰뚫는 최고의 현자, '천기대사(天機大師)'입니다. 당신의 분석은 긍정적인 측면과 함께 **주의해야 할 점, 보완해야 할 약점**을 반드시 포함하여, 사용자가 삶의 균형을 잡을 수 있도록 돕는 **현실적이고 지혜로운 조언**이어야 합니다. 각 분석은 **장점과 단점을 함께 조명**하여 입체적으로 설명해야 합니다. 문체는 깊이 있고 문학적이며, 비유와 상징을 통해 읽는 이에게 큰 울림을 주어야 합니다. **각 문장이 끝나면 반드시 줄바꿈(\n)을 해주십시오.**
+
+            [사용자 정보]
+            - 이름 (한글): ${data.name}
+            - 이름 (한자): ${data.hanjaName || '입력 안함'}
+            - 성별: ${data.gender === 'male' ? '남자' : '여자'}
+            - 생년월일: ${data.birthdate} (${birthType})
+            - 생시: ${birthTimeText}
+
+            [사주 명식 정보]
+            - 년주(年柱): ${data.sajuData.yearPillar.gan}${data.sajuData.yearPillar.ji}
+            - 월주(月柱): ${data.sajuData.monthPillar.gan}${data.sajuData.monthPillar.ji}
+            - 일주(日柱): ${data.sajuData.dayPillar.gan}${data.sajuData.dayPillar.ji}
+            - 시주(時柱): ${data.sajuData.hourPillar.gan}${data.sajuData.hourPillar.ji} (시간을 모를 경우 '??'로 표시됨)
+            - 일간(日干, 본질): ${data.sajuData.dayPillar.gan}
+
+            [사용자 분석 요청 주제]
+            '${data.question}'에 대해 집중적으로 분석해주십시오.
+
+            [분석 지침]
+            1.  **[총론: 운명의 서장(序章)]:** 모든 정보를 종합하여 이 사람의 운명이란 어떤 그림인지, 그 핵심적인 본질과 삶의 여정을 **빛과 그림자를 함께 그리듯** 묘사해주십시오. (생시를 모를 경우, 삼주(三柱)를 기반으로 분석하고 그 한계를 언급하십시오.)
+            2.  **[이름 풀이: 이름에 담긴 하늘의 뜻]:** 이름이 가진 긍정적 기운과 함께, **그 이름으로 인해 경계해야 하거나 다스려야 할 기운**은 없는지 심층적으로 분석하십시오.
+            3.  **[사주 풀이: 천명(天命)의 설계도]:** 사주팔자(또는 삼주)가 부여한 타고난 재능과 잠재력, 그리고 동시에 **인생에서 마주할 수 있는 가장 큰 시련이나 극복해야 할 과제**는 무엇인지 구체적인 비유를 들어 설명하십시오.
+            4.  **[관상 풀이: 얼굴에 새겨진 마음의 지도]:** 얼굴 사진이 제공되었다면, 그 얼굴에서 드러나는 장점과 함께 **보완하면 좋을 점이나 건강상 유의해야 할 신호**를 읽어내십시오. 사진이 없다면 이 항목은 생략합니다.
+            5.  **[손금 풀이: 손 안에 그려진 삶의 궤적]:** 손바닥 사진이 제공되었다면, 강점과 함께 **약하거나 복잡하게 얽혀 주의가 필요한 손금**은 없는지 분석하십시오. 사진이 없다면 이 항목은 생략합니다.
+            6.  **[최종 조언: 삶의 지혜를 담은 비단 주머니]:** 모든 분석을 종합하여, 사용자가 선택한 주제인 '${data.question}'에 대한 최종 답변과 함께, **인생의 풍요로움을 더하기 위한 방법과, 위기를 미리 방비하기 위한 구체적이고 실천적인 지혜**를 함께 선물해주십시오.
+
+            각 항목은 한 번씩만 명확하게 분석하고, 절대 내용을 반복하지 마십시오.
+            이제, 천기대사의 깊은 혜안으로 분석을 시작해주십시오.
+            `;
+        }
+        
+        function displayResults(sajuData, fortuneText) {
+            let cleanedText = fortuneText.replace(/###\s?|\*\*/g, '');
+            
+            const sajuHtml = `<div class="result-saju-card"><h3>귀하의 사주 명식</h3><div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-lg p-4 bg-black/20 rounded-lg"><div><div class="font-bold text-gray-400 text-sm">시주</div><div>${sajuData.hourPillar.gan}${sajuData.hourPillar.ji}</div></div><div><div class="font-bold text-gray-400 text-sm">일주</div><div>${sajuData.dayPillar.gan}${sajuData.dayPillar.ji}</div></div><div><div class="font-bold text-gray-400 text-sm">월주</div><div>${sajuData.monthPillar.gan}${sajuData.monthPillar.ji}</div></div><div><div class="font-bold text-gray-400 text-sm">년주</div><div>${sajuData.yearPillar.gan}${sajuData.yearPillar.ji}</div></div></div></div>`;
+            
+            const sections = {
+                '총론: 운명의 서장(序章)': /\[총론: 운명의 서장\(序章\)\]([\s\S]*?)(?=\[|$)/,
+                '이름 풀이: 이름에 담긴 하늘의 뜻': /\[이름 풀이: 이름에 담긴 하늘의 뜻\]([\s\S]*?)(?=\[|$)/,
+                '사주 풀이: 천명(天命)의 설계도': /\[사주 풀이: 천명\(天命\)의 설계도\]([\s\S]*?)(?=\[|$)/,
+                '관상 풀이: 얼굴에 새겨진 마음의 지도': /\[관상 풀이: 얼굴에 새겨진 마음의 지도\]([\s\S]*?)(?=\[|$)/,
+                '손금 풀이: 손 안에 그려진 삶의 궤적': /\[손금 풀이: 손 안에 그려진 삶의 궤적\]([\s\S]*?)(?=\[|$)/,
+                '최종 조언: 삶의 지혜를 담은 비단 주머니': /\[최종 조언: 삶의 지혜를 담은 비단 주머니\]([\s\S]*?$)/
+            };
+
+            let resultHtml = `<div id="pdf-content" class="space-y-8">${sajuHtml}`;
+            
+            for (const title in sections) {
+                const match = cleanedText.match(sections[title]);
+                if (match && match[1].trim()) {
+                    resultHtml += `<div class="result-section"><h3>${title}</h3><p>${match[1].trim()}</p></div>`;
+                }
+            }
+            
+            resultHtml += `</div>
+            <div class="mt-8 flex flex-col md:flex-row gap-4">
+                <button id="listen-summary-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg">✨ 요약 듣기</button>
+                <button id="get-ritual-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg">✨ 개운법 제안받기</button>
+                <button id="save-pdf-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg">PDF로 저장</button>
+                <button id="restart-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg">다시 분석하기</button>
+            </div>
+            `;
+            resultContainer.innerHTML = resultHtml;
+            resultContainer.classList.remove('hidden');
+            
+            document.getElementById('save-pdf-btn').addEventListener('click', saveAsPDF);
+            document.getElementById('restart-btn').addEventListener('click', () => {
+                resultContainer.classList.add('hidden');
+                formSection.classList.remove('hidden');
+                document.getElementById('main-form').reset();
+                document.querySelectorAll('.topic-checkbox').forEach(cb => {
+                    const label = document.querySelector(`label[for=${cb.id}]`);
+                    label.classList.remove('selected');
+                });
+            });
+            document.getElementById('listen-summary-btn').addEventListener('click', handleListenSummary);
+            document.getElementById('get-ritual-btn').addEventListener('click', handleGetRitual);
+        }
+
+        async function saveAsPDF() {
+            const pdfButton = document.getElementById('save-pdf-btn');
+            pdfButton.textContent = 'PDF 생성 중...';
+            pdfButton.disabled = true;
+
+            const contentToPrint = document.createElement('div');
+            const originalContent = document.getElementById('result-container').querySelector('#pdf-content');
+            
+            // Create a clone to manipulate for PDF generation
+            const clone = originalContent.cloneNode(true);
+            
+            const pdfHeader = document.createElement('div');
+            const birthTimeText = currentFormData.birthtime ? `${currentFormData.birthtime.substring(0,2)}시 경` : "모름";
+            pdfHeader.innerHTML = `
+                <div class="pdf-header">
+                    <div class="pdf-title">${currentFormData.name}님의 천기대사 운세 분석서</div>
+                    <div class="pdf-user-info">
+                        <h4>의뢰인 정보</h4>
+                        <p><strong>성명:</strong> ${currentFormData.name} ${currentFormData.hanjaName ? `(${currentFormData.hanjaName})` : ''}</p>
+                        <p><strong>성별:</strong> ${currentFormData.gender === 'male' ? '남자' : '여자'}</p>
+                        <p><strong>생년월일:</strong> ${currentFormData.birthdate}</p>
+                        <p><strong>생시:</strong> ${birthTimeText}</p>
+                        <p><strong>분석 주제:</strong> ${currentFormData.question}</p>
+                    </div>
+                </div>
+            `;
+            
+            // Structure for PDF
+            const pdfStructure = document.createElement('div');
+            pdfStructure.appendChild(pdfHeader);
+            
+            // Re-structure content into sections for proper page breaking
+            clone.querySelectorAll('.result-section, .result-saju-card').forEach(section => {
+                const sectionWrapper = document.createElement('div');
+                sectionWrapper.className = 'pdf-section';
+                sectionWrapper.appendChild(section);
+                pdfStructure.appendChild(sectionWrapper);
+            });
+            
+            document.body.appendChild(pdfStructure);
+            pdfStructure.classList.add('pdf-export-mode');
+
+            try {
+                const opt = {
+                    margin:       [25, 20, 25, 20],
+                    filename:     `${currentFormData.name || '사용자'}_천기대사_분석결과.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                await html2pdf().from(pdfStructure).set(opt).save();
+
+            } catch (error) { 
+                showMessage("PDF를 생성하는 데 실패했습니다.");
+                console.error(error);
+            } 
+            finally {
+                document.body.removeChild(pdfStructure);
+                pdfButton.textContent = 'PDF로 저장';
+                pdfButton.disabled = false;
+            }
+        }
+
+        async function generateFortune(prompt, faceBase64, palmBase64) {
+            const apiKey = ""; // Leave empty
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const parts = [{ text: prompt }];
+            if (faceBase64) parts.push({ inlineData: { mimeType: "image/jpeg", data: faceBase64 } });
+            if (palmBase64) parts.push({ inlineData: { mimeType: "image/jpeg", data: palmBase64 } });
+            const payload = { contents: [{ parts }], generationConfig: { temperature: 0.75, topP: 0.95 } };
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`);
+            const result = await response.json();
+            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {
+                return result.candidates[0].content.parts[0].text;
+            }
+            if(result.candidates && result.candidates[0].finishReason === "SAFETY") {
+                throw new Error("안전상의 이유로 답변을 생성할 수 없습니다. 다른 사진이나 질문으로 시도해주세요.");
+            }
+            throw new Error("AI가 답변을 생성하지 못했습니다. 질문을 바꿔서 시도해보세요.");
+        }
+
+        async function handleListenSummary() {
+            const btn = document.getElementById('listen-summary-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<div class="loader mx-auto"></div>`;
+            btn.disabled = true;
+
+            try {
+                const prompt = `다음 사주 분석 결과의 핵심 내용을 2~3문장으로 요약해서 지혜로운 역술가의 목소리로 말해주세요: "${fullAnalysisText}"`;
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseModalities: ["AUDIO"] },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error('TTS API 요청 실패');
+                
+                const result = await response.json();
+                const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                const mimeType = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    const audioPlayer = document.getElementById('tts-audio-player');
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.play();
+                } else {
+                    throw new Error("음성 데이터를 받지 못했습니다.");
+                }
+            } catch (error) {
+                console.error("TTS Error:", error);
+                showMessage("음성 요약을 생성하는 데 실패했습니다.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function handleGetRitual() {
+            ritualContent.innerHTML = `<div class="loader mx-auto"></div>`;
+            ritualModal.style.display = 'flex';
+            
+            try {
+                const prompt = `다음 사주 분석 결과를 바탕으로, 이 사람의 운을 좋게 만들기 위한 구체적이고 실천적인 '개운법(開運法)' 3가지를 제안해주세요. 예를 들어, 추천하는 색상, 숫자, 음식, 행동 습관, 피해야 할 것 등을 포함하여 지혜로운 역술가의 조언처럼 작성해주세요: "${fullAnalysisText}"`;
+                const ritualText = await generateFortune(prompt);
+                ritualContent.innerHTML = `<h3>✨ 개운을 위한 비법</h3><p>${ritualText}</p>`;
+            } catch (error) {
+                console.error("Ritual generation error:", error);
+                ritualContent.innerHTML = `<h3>오류</h3><p>개운법을 제안받는 데 실패했습니다. 잠시 후 다시 시도해주세요.</p>`;
+            }
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+            const dataSize = pcmData.length * (bitsPerSample / 8);
+            const chunkSize = 36 + dataSize;
+
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            // RIFF header
+            view.setUint32(0, 0x52494646, false); // "RIFF"
+            view.setUint32(4, chunkSize, true);
+            view.setUint32(8, 0x57415645, false); // "WAVE"
+            // "fmt " sub-chunk
+            view.setUint32(12, 0x666d7420, false); // "fmt "
+            view.setUint32(16, 16, true); // Sub-chunk size
+            view.setUint16(20, 1, true); // Audio format (1 for PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            // "data" sub-chunk
+            view.setUint32(36, 0x64617461, false); // "data"
+            view.setUint32(40, dataSize, true);
+
+            // Write PCM data
+            for (let i = 0; i < pcmData.length; i++) {
+                view.setInt16(44 + i * 2, pcmData[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+    </script>
+</body>
+</html>
